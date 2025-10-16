@@ -1,95 +1,173 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+// app/page.tsx
+'use client';
+
+import { useState } from 'react';
+import {
+  Container,
+  Stepper,
+  Step,
+  StepLabel,
+  Alert,
+  Box,
+  useMediaQuery,
+  Button,
+  Modal,
+  Typography,
+} from '@mui/material';
+import InputForm from './components/InputForm';
+import AnalysisResult from './components/AnalysisResult';
+import FeedbackButtons from './components/FeedbackButtons';
+import ChatInterface from './components/ChatInterface';
+import { analyzeBusiness, adoptOutcome } from './services/api';
+import { AnalyzeResponse, ApiResponse } from './types';  // Use AnalyzeResponse
+
+const steps = ['Enter Details', 'View Analysis', 'Feedback & Chat'];
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [activeStep, setActiveStep] = useState(0);
+  const [town, setTown] = useState('');
+  const [budget, setBudget] = useState('');
+  const [businessType, setBusinessType] = useState('');
+  const [result, setResult] = useState<ApiResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [liked, setLiked] = useState<boolean | null>(null);
+  const [comingSoonMessage, setComingSoonMessage] = useState('');
+  const [instanceKey, setInstanceKey] = useState('');  // For chat reset
+  const isMobile = useMediaQuery('(max-width:600px)');
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+  const handleAnalyze = async () => {
+    setLoading(true);
+    setError('');
+    setComingSoonMessage('');
+    try {
+      const data: AnalyzeResponse = await analyzeBusiness({  // Type as AnalyzeResponse
+        town,
+        budget: Number(budget),
+        businessType,
+      });
+
+      // Type guard for error response
+      if ('error' in data) {
+        if (data.error === 'coming_soon') {
+          setComingSoonMessage(data.message || 'Coming soon!');
+        } else {
+          setError(data.message || 'Analysis failed');
+        }
+        return;
+      }
+
+      // Success: data is ApiResponse
+      const newInstanceKey = `${town.toLowerCase()}_${businessType.toLowerCase()}_${budget}`;
+      setInstanceKey(newInstanceKey);
+      setResult(data);
+      setActiveStep(1);
+    } catch (err: any) {
+      setError(err.message || 'Analysis failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFeedback = async (yes: boolean) => {
+    setLiked(yes);
+    if (result?.outcomeId) {
+      try {
+        await adoptOutcome(result.outcomeId, yes);
+      } catch {
+        console.error('Adopt failed');
+      }
+    }
+    setActiveStep(2);
+  };
+
+  const handleClose = () => {
+    setActiveStep(0);
+    setResult(null);
+    setLiked(null);
+    setInstanceKey('');  // Resets chat session
+  };
+
+  const yesQuick = [
+    { label: 'Suppliers', prompt: 'Need suppliers – what type?' },
+    { label: 'Painters', prompt: 'Need painters – for what (interior/exterior)?' },
+    { label: 'Hire Employees', prompt: 'Need hiring help – what roles?' },
+    { label: 'Permits', prompt: 'What permits needed for a salon?' },
+    { label: 'Marketing', prompt: 'Low-budget marketing ideas.' },
+  ];
+
+  const noQuick = [
+    { label: 'Alternatives', prompt: 'Suggest 2 other businesses for my budget.' },
+    { label: 'New Town', prompt: 'Better town for this business?' },
+    { label: 'Make It Work', prompt: 'Ways to improve viability here?' },
+  ];
+
+  const quickQuestions = liked ? yesQuick : noQuick;
+
+  return (
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Stepper
+        activeStep={activeStep}
+        orientation={isMobile ? 'vertical' : 'horizontal'}
+        sx={{ mb: 4 }}
+      >
+        {steps.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
+
+      {/* Step 0: Input Form */}
+      {activeStep === 0 && (
+        <InputForm
+          town={town}
+          setTown={setTown}
+          budget={budget}
+          setBudget={setBudget}
+          businessType={businessType}
+          setBusinessType={setBusinessType}
+          onAnalyze={handleAnalyze}
+          loading={loading}
+        />
+      )}
+
+      {/* Coming Soon Modal */}
+      <Modal open={!!comingSoonMessage} onClose={() => setComingSoonMessage('')}>
+        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, bgcolor: 'background.paper', p: 4, borderRadius: 2, boxShadow: 24 }}>
+          <Typography variant="h5" gutterBottom>Oops! Coming Soon</Typography>
+          <Typography>{comingSoonMessage}</Typography>
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="contained" onClick={() => { setComingSoonMessage(''); setActiveStep(0); }}>Back to Home</Button>
+          </Box>
+        </Box>
+      </Modal>
+
+      {/* Step 1: Analysis Result & Feedback */}
+      {activeStep === 1 && result && (
+        <>
+          <AnalysisResult result={result} />
+          <FeedbackButtons onFeedback={handleFeedback} />
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+            <Button variant="outlined" onClick={handleClose}>
+              Close & Back to Home
+            </Button>
+          </Box>
+        </>
+      )}
+
+      {/* Step 2: Chat Interface */}
+      {activeStep === 2 && result && (
+        <>
+          <ChatInterface originalResult={result} quickQuestions={quickQuestions} instanceKey={instanceKey} />
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+            <Button variant="outlined" onClick={handleClose}>
+              Close Chat & Back to Home
+            </Button>
+          </Box>
+          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        </>
+      )}
+    </Container>
   );
 }
