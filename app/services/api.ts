@@ -2,10 +2,10 @@
 import axios from 'axios';
 import { AnalyzeResponse } from '../types';
 
-// Use env var (falls back to localhost if missing)
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+// Use env var; trim trailing slash to prevent //api
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000').replace(/\/$/, '');
 
-export const analyzeBusiness = async (payload: { town: string; budget: number; businessType: string }) => {
+export const analyzeBusiness = async (payload: { town: string; budget: number; businessType: string }): Promise<AnalyzeResponse> => {
   const res = await axios.post<AnalyzeResponse>(`${API_BASE}/api/analyze`, payload);
   return res.data;
 };
