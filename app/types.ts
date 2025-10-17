@@ -1,4 +1,3 @@
-// app/types.ts
 export interface ApiResponse {
   viability_score: number;
   summary: string;
@@ -7,11 +6,11 @@ export interface ApiResponse {
   alternatives: { business: string; why: string }[];
   security_actions: string[];
   confidence_note?: string;
-  outcomeId?: number;  // Added for adoption
+  outcomeId?: number;
 }
 
-// New: Union type for /api/analyze responses (success or error)
-export type AnalyzeResponse = ApiResponse | { error: string; message?: string };
+// Updated: Handle new errors from backend (coming_soon, building_not_found)
+export type AnalyzeResponse = ApiResponse | { error: 'coming_soon' | 'building_not_found' | string; message?: string };
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -19,7 +18,6 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-// Quick question type (for chat)
 export interface QuickQuestion {
   label: string;
   prompt: string;

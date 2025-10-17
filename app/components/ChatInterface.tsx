@@ -2,26 +2,27 @@ import { useState } from 'react';
 import { Box, TextField, Button, Typography, Paper } from '@mui/material';
 import { sendFollowUp } from '../services/api';
 import { useChatSession } from '../hooks/useChatSession';
-import { ApiResponse, QuickQuestion } from '../types';  // Import QuickQuestion
+import { ApiResponse, QuickQuestion } from '../types';
 
 interface Props {
   originalResult: ApiResponse;
   quickQuestions: QuickQuestion[];
-  instanceKey?: string;  // New: Optional prop for session key
+  instanceKey?: string;
 }
 
 export default function ChatInterface({ originalResult, quickQuestions, instanceKey = 'default' }: Props) {
-  const { history, addMessage } = useChatSession(instanceKey);  // Pass instanceKey
+  const { history, addMessage } = useChatSession(instanceKey);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Enhanced: Pass full context including vacancy_note if present
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
     addMessage('user', text);
     setLoading(true);
     try {
       const aiAnswer = await sendFollowUp({
-        originalContext: originalResult,
+        originalContext: originalResult,  // Already has vacancy_note from backend
         userQuestion: text,
         history,
       });
@@ -36,11 +37,10 @@ export default function ChatInterface({ originalResult, quickQuestions, instance
 
   return (
     <Box sx={{ mt: 3 }}>
-        
-<Typography variant="h6" sx={{ mb: 2 }}>
-  Business Setup Assistant
-  <Button variant="text" size="small" onClick={() => window.location.href = '/'} sx={{ ml: 2 }}>Close Chat</Button>
-</Typography>
+      <Typography variant="h6" sx={{ mb: 2 }}>
+        Business Setup Assistant
+        <Button variant="text" size="small" onClick={() => window.location.href = '/'} sx={{ ml: 2 }}>Close Chat</Button>
+      </Typography>
       <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {quickQuestions.map((q, i) => (
           <Button key={i} variant="outlined" size="small" onClick={() => sendMessage(q.prompt)}>
